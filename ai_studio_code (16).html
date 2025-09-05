@@ -1,0 +1,307 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Freque!</title>
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🔊</text></svg>">
+  <style>
+    :root {
+      --bg: #121213;
+      --fg: #d7dadc;
+      --muted: #9aa0a6;
+      --accent: #6aaa64; /* Wordle green */
+      --panel: #1a1a1b;
+      --panel-2: #101112;
+      --tile: #3a3a3c; /* Absent gray */
+      --tile-muted: #787c7e;
+      --wordle-yellow: #c9b458; /* Present yellow */
+      --wordle-green: #6aaa64; /* Correct green */
+    }
+    * { box-sizing: border-box; }
+    html, body { height: 100%; }
+    body {
+      margin: 0; background: var(--bg); color: var(--fg); font: 16px/1.4 system-ui, -apple-system, Segoe UI, Roboto, Inter, Ubuntu, Cantarell, Noto Sans, Arial, sans-serif;
+      display: grid; place-items: center; padding: 12px;
+    }
+    .app {
+      width: min(500px, 100%);
+      max-height: 95vh;
+      overflow-y: auto;
+      background: linear-gradient(180deg, var(--panel), var(--panel-2));
+      border: 1px solid var(--tile); border-radius: 16px; padding: 20px 18px;
+      box-shadow: 0 10px 30px rgba(0,0,0,.35);
+    }
+    h1 { margin: 0 0 12px; font-size: 28px; font-weight: 700; text-align: center; }
+    
+    /* Game Board & Tiles */
+    .game-board { display: flex; flex-direction: column; gap: 8px; margin-bottom: 20px; }
+    .history-grid { display: flex; flex-direction: column; gap: 8px; }
+    .guess-row { display: grid; grid-template-columns: repeat(5, 1fr); gap: 8px; perspective: 500px; }
+    
+    .tile { background: none; border: none; padding: 0; aspect-ratio: 1 / 1; }
+    .tile-inner {
+      position: relative; width: 100%; height: 100%;
+      transition: transform 0.6s; transform-style: preserve-3d;
+    }
+    .tile.flip .tile-inner { transform: rotateX(180deg); }
+    .tile-face {
+      position: absolute; width: 100%; height: 100%;
+      -webkit-backface-visibility: hidden; backface-visibility: hidden;
+      display: flex; justify-content: center; align-items: center;
+      font-size: clamp(20px, 5vw, 32px); font-weight: bold;
+      border: 2px solid var(--tile);
+    }
+    .tile-front { background: none; }
+    .tile-back { transform: rotateX(180deg); color: #fff; }
+
+    .input-tile {
+      width: 100%; height: 100%; aspect-ratio: 1 / 1; 
+      border: 2px solid var(--tile-muted); color: var(--fg);
+      background: var(--bg); font-size: clamp(20px, 5vw, 32px); font-weight: bold;
+      display: flex; justify-content: center; align-items: center;
+      transition: border-color 0.2s;
+    }
+    #current-guess .input-tile.active { border-color: var(--accent); }
+    
+    .tile-back.correct, .key.correct { background: var(--wordle-green); border-color: var(--wordle-green); color: #fff; }
+    .tile-back.present, .key.present { background: var(--wordle-yellow); border-color: var(--wordle-yellow); color: #fff; }
+    .tile-back.absent, .key.absent { background: var(--tile); border-color: var(--tile); color: #fff; opacity: 0.6; }
+
+    /* Controls & Keyboard */
+    .controls-grid { display: grid; grid-template-columns: 1fr auto; gap: 12px; margin-bottom: 20px; }
+    .row { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; }
+    button {
+      appearance: none; border: 1px solid var(--tile); background: var(--tile); color: var(--fg);
+      padding: 10px 14px; border-radius: 10px; cursor: pointer; font-weight: 600;
+      transition: transform .06s ease, background .2s ease, border-color .2s ease;
+    }
+    .hidden { display: none; }
+    button:hover { background: #4a4a4c; }
+    button:active { transform: translateY(1px); }
+    button.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+    .submit-btn {
+        font-size: 24px; padding: 8px 16px; background: var(--accent);
+        border-color: var(--accent); color: #fff;
+    }
+    .submit-btn:hover { background: #5a9856; }
+    #helpBtn { padding: 0; width: 38px; height: 38px; border-radius: 50%; font-size: 20px; }
+    
+    #keyboard { display: flex; flex-direction: column; gap: 8px; user-select: none; }
+    .key-row { display: flex; justify-content: center; gap: 6px; }
+    .key {
+      font-family: inherit; font-size: 16px; font-weight: bold; padding: 18px 12px;
+      border-radius: 4px; flex: 1; min-width: 0;
+      background: var(--tile-muted); border: none;
+    }
+    .key.wide { flex: 1; font-size: 20px; }
+    
+    /* Modal */
+    .modal-overlay { 
+      position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.7); 
+      display: none; place-items: center; z-index: 101; padding: 12px;
+    }
+    .modal-overlay.visible { display: grid; }
+    .modal-content { 
+      position: relative;
+      background: var(--panel); padding: 24px; border-radius: 12px; text-align: center; 
+      width: min(500px, 90vw);
+    }
+    .share-result { 
+      background: var(--bg); padding: 12px; border-radius: 8px; margin: 16px 0; 
+      white-space: pre-wrap; word-break: break-all; font-family: monospace; text-align: left;
+    }
+    .close-btn {
+        position: absolute; top: 8px; right: 8px;
+        width: 32px; height: 32px; font-size: 20px;
+        border: none; background: transparent; color: var(--muted); cursor: pointer;
+    }
+    .modal-content ul { text-align: left; padding-left: 20px; }
+    .modal-content li { margin-bottom: 10px; }
+  </style>
+</head>
+<body>
+
+  <main class="app" role="application">
+    <h1>Freque!</h1>
+
+    <div class="game-board">
+      <div id="history" class="history-grid"></div>
+      <div id="current-guess" class="guess-row">
+        <div class="input-tile"></div>
+        <div class="input-tile"></div>
+        <div class="input-tile"></div>
+        <div class="input-tile"></div>
+        <div class="input-tile"></div>
+      </div>
+    </div>
+    
+    <div class="controls-grid">
+      <div class="row" role="group" aria-label="Controles de áudio">
+        <button id="playBtn">Tocar</button>
+        <button id="pauseBtn" class="hidden">Pausar</button>
+        <button id="helpBtn" title="Regras">?</button>
+      </div>
+      <button id="submitGuessBtn" class="submit-btn" title="Enviar Palpite">➤</button>
+    </div>
+
+    <div id="keyboard">
+      <div class="key-row">
+        <button class="key" data-key="0">0</button>
+        <button class="key" data-key="1">1</button>
+        <button class="key" data-key="2">2</button>
+        <button class="key" data-key="3">3</button>
+        <button class="key" data-key="4">4</button>
+      </div>
+      <div class="key-row">
+        <button class="key" data-key="5">5</button>
+        <button class="key" data-key="6">6</button>
+        <button class="key" data-key="7">7</button>
+        <button class="key" data-key="8">8</button>
+        <button class="key" data-key="9">9</button>
+      </div>
+      <div class="key-row">
+        <button class="key wide" data-key="backspace">⌫</button>
+      </div>
+    </div>
+
+    <button id="playAgainBtn" class="primary hidden" style="width: 100%; margin-top: 20px;">Jogar Novamente</button>
+  </main>
+  
+  <div id="winModal" class="modal-overlay">
+    <div class="modal-content">
+      <button class="close-btn" data-close-modal>X</button>
+      <h2>Você Conseguiu!</h2>
+      <p>A frequência era: <strong id="finalFreq"></strong></p>
+      <div id="shareResult" class="share-result"></div>
+      <button id="shareBtn" class="primary">Copiar Resultado</button>
+    </div>
+  </div>
+
+  <div id="helpModal" class="modal-overlay">
+    <div class="modal-content">
+        <button class="close-btn" data-close-modal>X</button>
+        <h2>Como Jogar</h2>
+        <p>Adivinhe a frequência secreta de 5 dígitos.</p>
+        <ul>
+            <li>Use o som como principal guia. Preste atenção se o tom é grave ou agudo.</li>
+            <li>Após cada palpite, a cor dos blocos e do teclado mudará para mostrar o quão perto você está.</li>
+            <li><span style="color: var(--wordle-green)"><b>Verde:</b></span> O número está no lugar certo.</li>
+            <li><span style="color: var(--wordle-yellow)"><b>Amarelo:</b></span> O número existe na frequência, mas em outro lugar.</li>
+            <li><span style="color: var(--muted)"><b>Cinza:</b></span> O número não existe na frequência.</li>
+            <li><b>Atenção:</b> Alguns números podem se repetir na frequência!</li>
+        </ul>
+    </div>
+  </div>
+
+  <canvas id="confetti-canvas" style="position: fixed; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; z-index: 100;"></canvas>
+
+  <script>
+    // ===== Audio Engine =====
+    let audioContext, oscillator, masterGain;
+    let isPlaying = false;
+    let targetFrequency = 0;
+    const EPS = 0.0001;
+    function initAudio() { if (audioContext) return; audioContext = new (window.AudioContext || window.webkitAudioContext)(); oscillator = audioContext.createOscillator(); oscillator.type = 'sine'; masterGain = audioContext.createGain(); masterGain.gain.setValueAtTime(EPS, audioContext.currentTime); oscillator.connect(masterGain).connect(audioContext.destination); oscillator.start(); }
+    async function play() { if (isGameOver) return; if (!audioContext) initAudio(); if (audioContext.state === 'suspended') await audioContext.resume(); masterGain.gain.exponentialRampToValueAtTime(0.5, audioContext.currentTime + 0.2); isPlaying = true; document.getElementById('playBtn').classList.add('hidden'); document.getElementById('pauseBtn').classList.remove('hidden'); }
+    function pause() { if (!audioContext) return; masterGain.gain.exponentialRampToValueAtTime(EPS, audioContext.currentTime + 0.2); isPlaying = false; document.getElementById('pauseBtn').classList.add('hidden'); document.getElementById('playBtn').classList.remove('hidden'); }
+    function setFrequency(hz) { if (audioContext) oscillator.frequency.exponentialRampToValueAtTime(hz, audioContext.currentTime + 0.1); }
+    function playVictorySound() { if (!audioContext) return; const now = audioContext.currentTime; const o = audioContext.createOscillator(); const g = audioContext.createGain(); o.type = 'sine'; o.connect(g).connect(audioContext.destination); const notes = [261.63, 329.63, 392.00, 523.25]; const dur = 0.13; g.gain.setValueAtTime(EPS, now); notes.forEach((n, i) => { const st = now + i * dur; o.frequency.setValueAtTime(n, st); g.gain.linearRampToValueAtTime(0.6, st + 0.02); g.gain.exponentialRampToValueAtTime(EPS, st + dur); }); o.start(now); o.stop(now + notes.length * dur); }
+
+    // ===== Game Logic =====
+    const guessTiles = document.querySelectorAll('#current-guess .input-tile');
+    const historyContainer = document.getElementById('history');
+    const playAgainBtn = document.getElementById('playAgainBtn');
+    const submitGuessBtn = document.getElementById('submitGuessBtn');
+    const winModal = document.getElementById('winModal');
+    const helpModal = document.getElementById('helpModal');
+    const helpBtn = document.getElementById('helpBtn');
+    const keyboardEl = document.getElementById('keyboard');
+
+    let targetFrequencyString = '';
+    let guessHistory = [];
+    let isGameOver = false;
+    let currentGuess = [];
+    let keyStates = {};
+
+    function newGame() {
+        isGameOver = false;
+        guessHistory = [];
+        currentGuess = [];
+        historyContainer.innerHTML = '';
+        playAgainBtn.classList.add('hidden');
+        keyStates = {}; "0123456789".split('').forEach(k => keyStates[k] = 'default');
+        updateKeyboardVisuals();
+        updateGuessTiles();
+
+        const minFreq = 20, maxFreq = 20000;
+        const minLog = Math.log(minFreq), maxLog = Math.log(maxFreq);
+        targetFrequency = Math.floor(Math.exp(minLog + Math.random() * (maxLog - minLog)));
+        targetFrequencyString = String(targetFrequency).padStart(5, '0');
+        
+        console.log(`Nova Frequência Secreta: ${targetFrequencyString}`);
+        if(audioContext) { setFrequency(targetFrequency); play(); } 
+        else { document.getElementById('pauseBtn').classList.add('hidden'); document.getElementById('playBtn').classList.remove('hidden'); }
+        
+        winModal.classList.remove('visible');
+    }
+
+    function handleSubmit() {
+      if (isGameOver || currentGuess.length !== 5) return;
+      const guessString = currentGuess.join('');
+      const result = checkGuess(guessString);
+      renderGuess(guessString, result);
+      guessHistory.push(result);
+      updateKeyStates(guessString, result);
+      updateKeyboardVisuals();
+      currentGuess = [];
+      updateGuessTiles();
+
+      if (guessString === targetFrequencyString) {
+        pause(); isGameOver = true;
+        setTimeout(winGame, 1200);
+      }
+    }
+
+    function handleKeyPress(key) { if (isGameOver || currentGuess.length >= 5) return; currentGuess.push(key); updateGuessTiles(); }
+    function handleBackspace() { if (currentGuess.length > 0) { currentGuess.pop(); updateGuessTiles(); } }
+    function updateGuessTiles() { guessTiles.forEach((tile, i) => { tile.textContent = currentGuess[i] || ''; tile.classList.toggle('active', i === currentGuess.length && !isGameOver); }); }
+    
+    function updateKeyStates(guess, result) { guess.split('').forEach((key, i) => { const cs = keyStates[key]; const ns = result[i]; if (ns === 'correct') keyStates[key] = 'correct'; else if (ns === 'present' && cs !== 'correct') keyStates[key] = 'present'; else if (ns === 'absent' && cs === 'default') keyStates[key] = 'absent'; }); }
+    function updateKeyboardVisuals() { for (const keyEl of keyboardEl.querySelectorAll('.key')) { const key = keyEl.dataset.key; if ("0123456789".includes(key)) { keyEl.className = 'key'; if (keyStates[key] !== 'default') keyEl.classList.add(keyStates[key]); } } }
+
+    function checkGuess(guess) { const gc = guess.split(''); const tc = targetFrequencyString.split(''); const r = Array(5).fill('absent'); for (let i = 0; i < 5; i++) { if (gc[i] === tc[i]) { r[i] = 'correct'; tc[i] = null; } } for (let i = 0; i < 5; i++) { if (r[i] !== 'correct' && tc.includes(gc[i])) { r[i] = 'present'; tc[tc.indexOf(gc[i])] = null; } } return r; }
+    function renderGuess(guess, result) { const row = document.createElement('div'); row.className = 'guess-row'; guess.split('').forEach((char, i) => { const t = document.createElement('div'); t.className = 'tile'; const ti = document.createElement('div'); ti.className = 'tile-inner'; const tf = document.createElement('div'); tf.className = 'tile-face tile-front'; tf.textContent = char; const tb = document.createElement('div'); tb.className = 'tile-face tile-back'; tb.textContent = char; ti.appendChild(tf); ti.appendChild(tb); t.appendChild(ti); setTimeout(() => { t.classList.add('flip'); tb.classList.add(result[i]); }, i * 200); row.appendChild(t); }); historyContainer.appendChild(row); }
+    
+    function winGame() { playVictorySound(); playAgainBtn.classList.remove('hidden'); document.getElementById('finalFreq').textContent = `${targetFrequency} Hz`; document.getElementById('shareResult').textContent = generateShareText(); winModal.classList.add('visible'); triggerConfetti(); }
+    function generateShareText() { const t = `Freque! - Consegui em ${guessHistory.length} tentativas!`; const g = guessHistory.map(r => { return r.map(s => { if (s === 'correct') return '🟩'; if (s === 'present') return '🟨'; return '⬛'; }).join(''); }).join('\n'); return `${t}\n\n${g}`; }
+
+    // ===== Event Listeners =====
+    playAgainBtn.addEventListener('click', newGame);
+    submitGuessBtn.addEventListener('click', handleSubmit);
+    document.getElementById('playBtn').addEventListener('click', () => { initAudio(); setFrequency(targetFrequency); play(); });
+    document.getElementById('pauseBtn').addEventListener('click', pause);
+    
+    // Modal Listeners
+    helpBtn.addEventListener('click', () => { if(isPlaying) pause(); helpModal.classList.add('visible'); });
+    document.querySelectorAll('[data-close-modal]').forEach(el => el.addEventListener('click', () => { winModal.classList.remove('visible'); helpModal.classList.remove('visible'); }));
+    winModal.addEventListener('click', (e) => { if (e.target === winModal) winModal.classList.remove('visible'); });
+    helpModal.addEventListener('click', (e) => { if (e.target === helpModal) helpModal.classList.remove('visible'); });
+
+    document.getElementById('shareBtn').addEventListener('click', () => { navigator.clipboard.writeText(generateShareText()).then(() => alert('Resultado copiado!')); });
+
+    // Keyboard Listeners
+    keyboardEl.addEventListener('click', (e) => { if(e.target.matches('[data-key]')) { const key = e.target.dataset.key; if (key === 'backspace') handleBackspace(); else if ("0123456789".includes(key)) handleKeyPress(key); } });
+    window.addEventListener('keydown', (e) => { if (e.key === 'Enter') handleSubmit(); else if (e.key === 'Backspace') handleBackspace(); else if ("0123456789".includes(e.key)) handleKeyPress(e.key); });
+
+    // ===== Confetti =====
+    const canvas = document.getElementById('confetti-canvas'); const ctx = canvas.getContext('2d'); let confettiParticles = [];
+    function triggerConfetti() { const pC = 200; const c = ['#6aaa64', '#c9b458', '#d7dadc', '#ffffff']; confettiParticles = []; for (let i = 0; i < pC; i++) { confettiParticles.push({ x: canvas.width / 2, y: canvas.height, vx: (Math.random() - 0.5) * 10, vy: Math.random() * -20 - 15, size: Math.random() * 6 + 2, color: c[Math.floor(Math.random() * c.length)], }); } animateConfetti(); }
+    function animateConfetti() { ctx.clearRect(0, 0, canvas.width, canvas.height); const g = 0.3; confettiParticles.forEach((p, i) => { p.vy += g; p.x += p.vx; p.y += p.vy; ctx.fillStyle = p.color; ctx.fillRect(p.x, p.y, p.size, p.size); if (p.y > canvas.height) { confettiParticles.splice(i, 1); } }); if (confettiParticles.length > 0) { requestAnimationFrame(animateConfetti); } }
+    window.addEventListener('resize', () => { canvas.width = window.innerWidth; canvas.height = window.innerHeight; });
+    canvas.width = window.innerWidth; canvas.height = window.innerHeight;
+    
+    newGame();
+  </script>
+</body>
+</html>

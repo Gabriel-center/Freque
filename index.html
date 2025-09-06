@@ -274,7 +274,7 @@
     function renderGuess(guess, result) { const row = document.createElement('div'); row.className = 'guess-row'; guess.split('').forEach((char, i) => { const t = document.createElement('div'); t.className = 'tile'; const ti = document.createElement('div'); ti.className = 'tile-inner'; const tf = document.createElement('div'); tf.className = 'tile-face tile-front'; tf.textContent = char; const tb = document.createElement('div'); tb.className = 'tile-face tile-back'; tb.textContent = char; ti.appendChild(tf); ti.appendChild(tb); t.appendChild(ti); setTimeout(() => { t.classList.add('flip'); tb.classList.add(result[i]); }, i * 200); row.appendChild(t); }); historyContainer.appendChild(row); }
     
     function winGame() { playVictorySound(); playAgainBtn.classList.remove('hidden'); document.getElementById('finalFreq').textContent = `${targetFrequency} Hz`; document.getElementById('shareResult').textContent = generateShareText(); winModal.classList.add('visible'); triggerConfetti(); }
-    function generateShareText() { const t = `Freque! - Consegui em ${guessHistory.length} tentativas!`; const g = guessHistory.map(r => { return r.map(s => { if (s === 'correct') return '🟩'; if (s === 'present') return '🟨'; return '⬛'; }).join(''); }).join('\n'); return `${t}\n\n${g}`; }
+    function generateShareText() { const t = `Freque! - Consegui em ${guessHistory.length} tentativas!`; const g = guessHistory.map(r => { return r.map(s => { if (s === 'correct') return '🟩'; if (s === 'present') return '🟨'; return '⬛'; }).join(''); }).join('\n'); const f = `A frequência era ${targetFrequency} Hz\n\nJogue aqui: Gabriel-center.github.io/Freque`; return `${t}\n\n${g}\n\n${f}`; }
 
     // ===== Event Listeners =====
     playAgainBtn.addEventListener('click', newGame);
@@ -287,8 +287,43 @@
     document.querySelectorAll('[data-close-modal]').forEach(el => el.addEventListener('click', () => { winModal.classList.remove('visible'); helpModal.classList.remove('visible'); }));
     winModal.addEventListener('click', (e) => { if (e.target === winModal) winModal.classList.remove('visible'); });
     helpModal.addEventListener('click', (e) => { if (e.target === helpModal) helpModal.classList.remove('visible'); });
-
-    document.getElementById('shareBtn').addEventListener('click', () => { navigator.clipboard.writeText(generateShareText()).then(() => alert('Resultado copiado!')); });
+    
+    // UPDATED: Robust Clipboard Logic
+    document.getElementById('shareBtn').addEventListener('click', () => {
+        const textToCopy = generateShareText();
+        
+        // Try modern API (https or localhost)
+        if (navigator.clipboard && window.isSecureContext) {
+            navigator.clipboard.writeText(textToCopy).then(() => {
+                alert('Resultado copiado!');
+            }).catch(err => {
+                console.warn('Falha ao copiar com a API moderna, tentando fallback.', err);
+                fallbackCopyTextToClipboard(textToCopy);
+            });
+        } else {
+            // Fallback for insecure contexts (like file://) or old browsers
+            fallbackCopyTextToClipboard(textToCopy);
+        }
+    });
+    
+    function fallbackCopyTextToClipboard(text) {
+        const textArea = document.createElement("textarea");
+        textArea.value = text;
+        textArea.style.top = "0";
+        textArea.style.left = "0";
+        textArea.style.position = "fixed";
+        document.body.appendChild(textArea);
+        textArea.focus();
+        textArea.select();
+        try {
+            const successful = document.execCommand('copy');
+            if(successful) alert('Resultado copiado!');
+            else alert('Não foi possível copiar o resultado.');
+        } catch (err) {
+            alert('Não foi possível copiar o resultado.');
+        }
+        document.body.removeChild(textArea);
+    }
 
     // Keyboard Listeners
     keyboardEl.addEventListener('click', (e) => { if(e.target.matches('[data-key]')) { const key = e.target.dataset.key; if (key === 'backspace') handleBackspace(); else if ("0123456789".includes(key)) handleKeyPress(key); } });

@@ -7,38 +7,32 @@
   <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🔊</text></svg>">
   <style>
     :root {
-      --bg: #121213;
-      --fg: #d7dadc;
-      --muted: #9aa0a6;
-      --accent: #6aaa64; /* Wordle green */
-      --panel: #1a1a1b;
-      --panel-2: #101112;
-      --tile: #3a3a3c; /* Absent gray */
-      --tile-muted: #787c7e;
-      --wordle-yellow: #c9b458; /* Present yellow */
-      --wordle-green: #6aaa64; /* Correct green */
+      --bg:#121213; --fg:#d7dadc; --muted:#9aa0a6; --accent:#6aaa64;
+      --panel:#1a1a1b; --panel-2:#101112;
+      --tile:#3a3a3c; --tile-muted:#787c7e;
+      --wordle-yellow:#c9b458; --wordle-green:#6aaa64;
+      --hint-blue:#4aa3ff; --hint-red:#e85d5d;
     }
     * { box-sizing: border-box; }
     html, body { height: 100%; }
     body {
-      margin: 0; background: var(--bg); color: var(--fg); font: 16px/1.4 system-ui, -apple-system, Segoe UI, Roboto, Inter, Ubuntu, Cantarell, Noto Sans, Arial, sans-serif;
+      margin: 0; background: var(--bg); color: var(--fg);
+      font: 16px/1.4 system-ui,-apple-system,Segoe UI,Roboto,Inter,Ubuntu,Cantarell,Noto Sans,Arial,sans-serif;
       display: grid; place-items: center; padding: 12px;
     }
     .app {
-      width: min(500px, 100%);
-      max-height: 95vh;
-      overflow-y: auto;
+      width: min(500px, 100%); max-height: 95vh; overflow-y: auto;
       background: linear-gradient(180deg, var(--panel), var(--panel-2));
       border: 1px solid var(--tile); border-radius: 16px; padding: 20px 18px;
       box-shadow: 0 10px 30px rgba(0,0,0,.35);
     }
     h1 { margin: 0 0 12px; font-size: 28px; font-weight: 700; text-align: center; }
-    
+
     /* Game Board & Tiles */
     .game-board { display: flex; flex-direction: column; gap: 8px; margin-bottom: 20px; }
     .history-grid { display: flex; flex-direction: column; gap: 8px; }
     .guess-row { display: grid; grid-template-columns: repeat(5, 1fr); gap: 8px; perspective: 500px; }
-    
+
     .tile { background: none; border: none; padding: 0; aspect-ratio: 1 / 1; }
     .tile-inner {
       position: relative; width: 100%; height: 100%;
@@ -52,21 +46,36 @@
       font-size: clamp(20px, 5vw, 32px); font-weight: bold;
       border: 2px solid var(--tile);
     }
-    .tile-front { background: none; }
+    .tile-front { background: var(--panel); } /* opaque front now */
     .tile-back { transform: rotateX(180deg); color: #fff; }
 
     .input-tile {
-      width: 100%; height: 100%; aspect-ratio: 1 / 1; 
+      width: 100%; height: 100%; aspect-ratio: 1 / 1;
       border: 2px solid var(--tile-muted); color: var(--fg);
       background: var(--bg); font-size: clamp(20px, 5vw, 32px); font-weight: bold;
       display: flex; justify-content: center; align-items: center;
       transition: border-color 0.2s;
     }
     #current-guess .input-tile.active { border-color: var(--accent); }
-    
+
     .tile-back.correct, .key.correct { background: var(--wordle-green); border-color: var(--wordle-green); color: #fff; }
     .tile-back.present, .key.present { background: var(--wordle-yellow); border-color: var(--wordle-yellow); color: #fff; }
-    .tile-back.absent, .key.absent { background: var(--tile); border-color: var(--tile); color: #fff; opacity: 0.6; }
+    .tile-back.absent, .key.absent {
+      background: var(--tile);
+      border-color: var(--tile);
+      color: rgba(255,255,255,.75); /* dimmed text */
+      opacity: 1; /* no transparency */
+    }
+
+    .tile-back.higher { background: var(--hint-blue); border-color: var(--hint-blue); }
+    .tile-back.lower  { background: var(--hint-red);  border-color: var(--hint-red); }
+    .tile-back.higher::after,
+    .tile-back.lower::after {
+      position: absolute; right: 6px; top: 2px;
+      font-size: 14px; font-weight: 900; text-shadow: 0 1px 0 rgba(0,0,0,.35);
+    }
+    .tile-back.higher::after { content: '▲'; }
+    .tile-back.lower::after  { content: '▼'; }
 
     /* Controls & Keyboard */
     .controls-grid { display: grid; grid-template-columns: 1fr auto; gap: 12px; margin-bottom: 20px; }
@@ -80,44 +89,42 @@
     button:hover { background: #4a4a4c; }
     button:active { transform: translateY(1px); }
     button.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
-    .submit-btn {
-        font-size: 24px; padding: 8px 16px; background: var(--accent);
-        border-color: var(--accent); color: #fff;
-    }
+    .submit-btn { font-size: 24px; padding: 8px 16px; background: var(--accent); border-color: var(--accent); color: #fff; }
     .submit-btn:hover { background: #5a9856; }
-    #helpBtn { padding: 0; width: 38px; height: 38px; border-radius: 50%; font-size: 20px; }
-    
+    #helpBtn, #menuBtn { padding: 0; width: 38px; height: 38px; border-radius: 50%; font-size: 20px; }
+
     #keyboard { display: flex; flex-direction: column; gap: 8px; user-select: none; }
     .key-row { display: flex; justify-content: center; gap: 6px; }
     .key {
       font-family: inherit; font-size: 16px; font-weight: bold; padding: 18px 12px;
-      border-radius: 4px; flex: 1; min-width: 0;
-      background: var(--tile-muted); border: none;
+      border-radius: 4px; flex: 1; min-width: 0; background: var(--tile-muted); border: none;
     }
     .key.wide { flex: 1; font-size: 20px; }
-    
+
     /* Modal */
-    .modal-overlay { 
-      position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.7); 
-      display: none; place-items: center; z-index: 101; padding: 12px;
-    }
+    .modal-overlay { position: fixed; inset:0; background: rgba(0,0,0,0.7); display: none; place-items: center; z-index: 101; padding: 12px; }
     .modal-overlay.visible { display: grid; }
-    .modal-content { 
-      position: relative;
-      background: var(--panel); padding: 24px; border-radius: 12px; text-align: center; 
-      width: min(500px, 90vw);
-    }
-    .share-result { 
-      background: var(--bg); padding: 12px; border-radius: 8px; margin: 16px 0; 
-      white-space: pre-wrap; word-break: break-all; font-family: monospace; text-align: left;
-    }
-    .close-btn {
-        position: absolute; top: 8px; right: 8px;
-        width: 32px; height: 32px; font-size: 20px;
-        border: none; background: transparent; color: var(--muted); cursor: pointer;
-    }
+    .modal-content { position: relative; background: var(--panel); padding: 24px; border-radius: 12px; text-align: center; width: min(520px, 92vw); }
+    .share-result { background: var(--bg); padding: 12px; border-radius: 8px; margin: 16px 0; white-space: pre-wrap; word-break: break-all; font-family: monospace; text-align: left; }
+    .close-btn { position: absolute; top: 8px; right: 8px; width: 32px; height: 32px; font-size: 20px; border: none; background: transparent; color: var(--muted); cursor: pointer; }
     .modal-content ul { text-align: left; padding-left: 20px; }
     .modal-content li { margin-bottom: 10px; }
+
+    /* Mode menu */
+    .modes-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:10px}
+    .mode-card{border:1px solid var(--tile);background:var(--panel-2);border-radius:12px;padding:12px;cursor:pointer;text-align:center}
+    .mode-name{font-weight:800;margin-bottom:8px}
+    .chips{display:flex;justify-content:center;gap:4px;flex-wrap:wrap}
+    .chip{width:18px;height:18px;border-radius:4px;border:2px solid #0003}
+    .chip.green{background:var(--wordle-green);border-color:var(--wordle-green)}
+    .chip.yellow{background:var(--wordle-yellow);border-color:var(--wordle-yellow)}
+    .chip.black{background:var(--tile);border-color:var(--tile)}
+    .chip.blue{background:var(--hint-blue);border-color:var(--hint-blue)}
+    .chip.red{background:var(--hint-red);border-color:var(--hint-red)}
+
+    /* Feedback */
+    @keyframes shake{0%{transform:translateX(0)}25%{transform:translateX(-10px)}50%{transform:translateX(10px)}75%{transform:translateX(-6px)}100%{transform:translateX(0)}}
+    .shake{animation:shake .3s ease-in-out}
   </style>
 </head>
 <body>
@@ -135,12 +142,13 @@
         <div class="input-tile"></div>
       </div>
     </div>
-    
+
     <div class="controls-grid">
       <div class="row" role="group" aria-label="Controles de áudio">
-        <button id="playBtn">Tocar</button>
-        <button id="pauseBtn" class="hidden">Pausar</button>
+        <button id="playBtn" title="Tocar">▶</button>
+        <button id="pauseBtn" class="hidden" title="Pausar">❚❚</button>
         <button id="helpBtn" title="Regras">?</button>
+        <button id="menuBtn" title="Modos">☰</button>
       </div>
       <button id="submitGuessBtn" class="submit-btn" title="Enviar Palpite">➤</button>
     </div>
@@ -167,7 +175,8 @@
 
     <button id="playAgainBtn" class="primary hidden" style="width: 100%; margin-top: 20px;">Jogar Novamente</button>
   </main>
-  
+
+  <!-- Win Modal -->
   <div id="winModal" class="modal-overlay">
     <div class="modal-content">
       <button class="close-btn" data-close-modal>X</button>
@@ -178,19 +187,60 @@
     </div>
   </div>
 
+  <!-- Help Modal -->
   <div id="helpModal" class="modal-overlay">
     <div class="modal-content">
-        <button class="close-btn" data-close-modal>X</button>
-        <h2>Como Jogar</h2>
-        <p>Adivinhe a frequência secreta de 5 dígitos.</p>
-        <ul>
-            <li>Use o som como principal guia. Preste atenção se o tom é grave ou agudo.</li>
-            <li>Após cada palpite, a cor dos blocos e do teclado mudará para mostrar o quão perto você está.</li>
-            <li><span style="color: var(--wordle-green)"><b>Verde:</b></span> O número está no lugar certo.</li>
-            <li><span style="color: var(--wordle-yellow)"><b>Amarelo:</b></span> O número existe na frequência, mas em outro lugar.</li>
-            <li><span style="color: var(--muted)"><b>Cinza:</b></span> O número não existe na frequência.</li>
-            <li><b>Atenção:</b> Alguns números podem se repetir na frequência!</li>
-        </ul>
+      <button class="close-btn" data-close-modal>X</button>
+      <h2>Como Jogar</h2>
+      <p>Adivinhe a frequência secreta de 5 dígitos.</p>
+      <ul>
+        <li>Use o som como principal guia. Preste atenção se o tom é grave ou agudo.</li>
+        <li>Após cada palpite, a cor dos blocos e do teclado mostra o quão perto você está.</li>
+        <li><b style="color: var(--wordle-green)">Verde:</b> lugar certo.</li>
+        <li><b style="color: var(--wordle-yellow)">Amarelo:</b> existe, mas em outro lugar.</li>
+        <li><b style="color: var(--muted)">Cinza:</b> não existe na frequência.</li>
+        <li>Alguns números podem se repetir.</li>
+      </ul>
+    </div>
+  </div>
+
+  <!-- Mode Modal -->
+  <div id="modeModal" class="modal-overlay">
+    <div class="modal-content">
+      <button class="close-btn" data-close-modal>X</button>
+      <h2>Modos de Jogo</h2>
+      <div class="modes-grid">
+        <div class="mode-card" data-mode="padrao">
+          <div class="mode-name">Padrão</div>
+          <div class="chips"><div class="chip green"></div><div class="chip green"></div><div class="chip green"></div><div class="chip green"></div><div class="chip yellow"></div></div>
+        </div>
+        <div class="mode-card" data-mode="unico">
+          <div class="mode-name">Único</div>
+          <div class="chips"><div class="chip green"></div><div class="chip yellow"></div><div class="chip green"></div><div class="chip green"></div><div class="chip black"></div></div>
+        </div>
+        <div class="mode-card" data-mode="vertical">
+          <div class="mode-name">Vertical</div>
+          <div class="chips">
+            <div class="chip blue"></div><div class="chip red"></div><div class="chip green"></div>
+            <div class="chip red"></div><div class="chip blue"></div>
+          </div>
+        </div>
+                <div class="mode-card" data-mode="facil">
+          <div class="mode-name">Fácil</div>
+          <div class="chips"><div class="chip green"></div><div class="chip green"></div><div class="chip green"></div><div class="chip blue"></div><div class="chip red"></div></div>
+        </div>
+      </div>
+      <p style="margin-top:12px;color:var(--muted);font-size:14px">Mudar o modo reinicia a partida.</p>
+    </div>
+  </div>
+
+  <!-- Rules Modal -->
+  <div id="rulesModal" class="modal-overlay">
+    <div class="modal-content">
+      <button class="close-btn" data-close-modal>X</button>
+      <h2>Regras</h2>
+      <div id="rulesBody" style="text-align:left"></div>
+      <button id="startModeBtn" class="primary" style="margin-top:12px">Começar</button>
     </div>
   </div>
 
@@ -202,11 +252,46 @@
     let isPlaying = false;
     let targetFrequency = 0;
     const EPS = 0.0001;
-    function initAudio() { if (audioContext) return; audioContext = new (window.AudioContext || window.webkitAudioContext)(); oscillator = audioContext.createOscillator(); oscillator.type = 'sine'; masterGain = audioContext.createGain(); masterGain.gain.setValueAtTime(EPS, audioContext.currentTime); oscillator.connect(masterGain).connect(audioContext.destination); oscillator.start(); }
-    async function play() { if (isGameOver) return; if (!audioContext) initAudio(); if (audioContext.state === 'suspended') await audioContext.resume(); masterGain.gain.exponentialRampToValueAtTime(0.5, audioContext.currentTime + 0.2); isPlaying = true; document.getElementById('playBtn').classList.add('hidden'); document.getElementById('pauseBtn').classList.remove('hidden'); }
-    function pause() { if (!audioContext) return; masterGain.gain.exponentialRampToValueAtTime(EPS, audioContext.currentTime + 0.2); isPlaying = false; document.getElementById('pauseBtn').classList.add('hidden'); document.getElementById('playBtn').classList.remove('hidden'); }
-    function setFrequency(hz) { if (audioContext) oscillator.frequency.exponentialRampToValueAtTime(hz, audioContext.currentTime + 0.1); }
-    function playVictorySound() { if (!audioContext) return; const now = audioContext.currentTime; const o = audioContext.createOscillator(); const g = audioContext.createGain(); o.type = 'sine'; o.connect(g).connect(audioContext.destination); const notes = [261.63, 329.63, 392.00, 523.25]; const dur = 0.13; g.gain.setValueAtTime(EPS, now); notes.forEach((n, i) => { const st = now + i * dur; o.frequency.setValueAtTime(n, st); g.gain.linearRampToValueAtTime(0.6, st + 0.02); g.gain.exponentialRampToValueAtTime(EPS, st + dur); }); o.start(now); o.stop(now + notes.length * dur); }
+    function initAudio() {
+      if (audioContext) return;
+      audioContext = new (window.AudioContext || window.webkitAudioContext)();
+      oscillator = audioContext.createOscillator();
+      oscillator.type = 'sine';
+      masterGain = audioContext.createGain();
+      masterGain.gain.setValueAtTime(EPS, audioContext.currentTime);
+      oscillator.connect(masterGain).connect(audioContext.destination);
+      oscillator.start();
+    }
+    async function play() {
+      if (isGameOver) return;
+      if (!audioContext) initAudio();
+      if (audioContext.state === 'suspended') await audioContext.resume();
+      masterGain.gain.exponentialRampToValueAtTime(0.5, audioContext.currentTime + 0.2);
+      isPlaying = true;
+      document.getElementById('playBtn').classList.add('hidden');
+      document.getElementById('pauseBtn').classList.remove('hidden');
+    }
+    function pause() {
+      if (!audioContext) return;
+      masterGain.gain.exponentialRampToValueAtTime(EPS, audioContext.currentTime + 0.2);
+      isPlaying = false;
+      document.getElementById('pauseBtn').classList.add('hidden');
+      document.getElementById('playBtn').classList.remove('hidden');
+    }
+    function setFrequency(hz) {
+      if (audioContext) oscillator.frequency.exponentialRampToValueAtTime(Math.max(1,hz), audioContext.currentTime + 0.1);
+    }
+    function playVictorySound() {
+      if (!audioContext) return;
+      const now = audioContext.currentTime;
+      const o = audioContext.createOscillator();
+      const g = audioContext.createGain();
+      o.type = 'sine'; o.connect(g).connect(audioContext.destination);
+      const notes = [261.63, 329.63, 392.00, 523.25]; const dur = 0.13;
+      g.gain.setValueAtTime(EPS, now);
+      notes.forEach((n, i) => { const st = now + i * dur; o.frequency.setValueAtTime(n, st); g.gain.linearRampToValueAtTime(0.6, st + 0.02); g.gain.exponentialRampToValueAtTime(EPS, st + dur); });
+      o.start(now); o.stop(now + notes.length * dur);
+    }
 
     // ===== Game Logic =====
     const guessTiles = document.querySelectorAll('#current-guess .input-tile');
@@ -217,12 +302,26 @@
     const helpModal = document.getElementById('helpModal');
     const helpBtn = document.getElementById('helpBtn');
     const keyboardEl = document.getElementById('keyboard');
+    const menuBtn = document.getElementById('menuBtn');
+    const modeModal = document.getElementById('modeModal');
+    const rulesModal = document.getElementById('rulesModal');
+    const rulesBody = document.getElementById('rulesBody');
+    const startModeBtn = document.getElementById('startModeBtn');
 
     let targetFrequencyString = '';
     let guessHistory = [];
     let isGameOver = false;
     let currentGuess = [];
     let keyStates = {};
+
+    // Modes
+    let gameMode = 'padrao'; // 'padrao' | 'facil' | 'unico' | 'vertical'
+    let pendingMode = null;
+
+    // Fácil trackers
+    let correctPositions = [false,false,false,false,false];
+    let uniqueTargetDigits = new Set();
+    let uniqueDigitsSolved = new Set();
 
     function newGame() {
         isGameOver = false;
@@ -234,26 +333,58 @@
         updateKeyboardVisuals();
         updateGuessTiles();
 
-        const minFreq = 20, maxFreq = 20000;
-        const minLog = Math.log(minFreq), maxLog = Math.log(maxFreq);
-        targetFrequency = Math.floor(Math.exp(minLog + Math.random() * (maxLog - minLog)));
-        targetFrequencyString = String(targetFrequency).padStart(5, '0');
-        
-        console.log(`Nova Frequência Secreta: ${targetFrequencyString}`);
-        if(audioContext) { setFrequency(targetFrequency); play(); } 
+        // target generation
+        const t = (gameMode === 'unico') ? genUniqueTarget() : genStandardTarget();
+        targetFrequency = t.n;
+        targetFrequencyString = t.s;
+
+        // Fácil trackers
+        correctPositions = [false,false,false,false,false];
+        uniqueTargetDigits = new Set(targetFrequencyString.split(''));
+        uniqueDigitsSolved = new Set();
+
+        console.log(`Modo: ${gameMode} | Nova Frequência: ${targetFrequencyString}`);
+        if(audioContext) { setFrequency(targetFrequency); play(); }
         else { document.getElementById('pauseBtn').classList.add('hidden'); document.getElementById('playBtn').classList.remove('hidden'); }
-        
-        winModal.classList.remove('visible');
+
+        [winModal, helpModal, modeModal, rulesModal].forEach(m => m.classList.remove('visible'));
+    }
+
+    function genStandardTarget(){
+      const minFreq = 20, maxFreq = 20000;
+      const minLog = Math.log(minFreq), maxLog = Math.log(maxFreq);
+      const n = Math.floor(Math.exp(minLog + Math.random() * (maxLog - minLog)));
+      return { n, s: String(n).padStart(5, '0') };
+    }
+    function genUniqueTarget(){
+      const minFreq = 20, maxFreq = 20000;
+      const minLog = Math.log(minFreq), maxLog = Math.log(maxFreq);
+      while(true){
+        const n = Math.floor(Math.exp(minLog + Math.random() * (maxLog - minLog)));
+        const s = String(n).padStart(5,'0');
+        if(new Set(s.split('')).size === 5) return { n, s };
+      }
     }
 
     function handleSubmit() {
-      if (isGameOver || currentGuess.length !== 5) return;
+      if (isGameOver) return;
       const guessString = currentGuess.join('');
-      const result = checkGuess(guessString);
+      if (guessString.length !== 5) { wiggleCurrentRow(); return; }
+
+      const guessValue = parseInt(guessString, 10);
+      if (guessValue < 20 || guessValue > 20000) { alert("A frequência deve estar entre 20 Hz e 20.000 Hz."); wiggleCurrentRow(); return; }
+      if (gameMode === 'unico' && new Set(guessString.split('')).size !== 5) { alert("Modo Único: use 5 dígitos diferentes."); wiggleCurrentRow(); return; }
+
+      let result;
+      if (gameMode === 'padrao' || gameMode === 'unico') result = checkGuessPadrao(guessString);
+      else if (gameMode === 'vertical') result = checkGuessVertical(guessString);
+      else if (gameMode === 'facil') result = checkGuessFacil(guessString);
+
       renderGuess(guessString, result);
       guessHistory.push(result);
-      updateKeyStates(guessString, result);
-      updateKeyboardVisuals();
+
+      if (gameMode !== 'vertical') { updateKeyStates(guessString, result); updateKeyboardVisuals(); }
+
       currentGuess = [];
       updateGuessTiles();
 
@@ -266,76 +397,193 @@
     function handleKeyPress(key) { if (isGameOver || currentGuess.length >= 5) return; currentGuess.push(key); updateGuessTiles(); }
     function handleBackspace() { if (currentGuess.length > 0) { currentGuess.pop(); updateGuessTiles(); } }
     function updateGuessTiles() { guessTiles.forEach((tile, i) => { tile.textContent = currentGuess[i] || ''; tile.classList.toggle('active', i === currentGuess.length && !isGameOver); }); }
-    
-    function updateKeyStates(guess, result) { guess.split('').forEach((key, i) => { const cs = keyStates[key]; const ns = result[i]; if (ns === 'correct') keyStates[key] = 'correct'; else if (ns === 'present' && cs !== 'correct') keyStates[key] = 'present'; else if (ns === 'absent' && cs === 'default') keyStates[key] = 'absent'; }); }
-    function updateKeyboardVisuals() { for (const keyEl of keyboardEl.querySelectorAll('.key')) { const key = keyEl.dataset.key; if ("0123456789".includes(key)) { keyEl.className = 'key'; if (keyStates[key] !== 'default') keyEl.classList.add(keyStates[key]); } } }
+    function wiggleCurrentRow(){ const row = document.getElementById('current-guess'); row.classList.remove('shake'); void row.offsetWidth; row.classList.add('shake'); }
 
-    function checkGuess(guess) { const gc = guess.split(''); const tc = targetFrequencyString.split(''); const r = Array(5).fill('absent'); for (let i = 0; i < 5; i++) { if (gc[i] === tc[i]) { r[i] = 'correct'; tc[i] = null; } } for (let i = 0; i < 5; i++) { if (r[i] !== 'correct' && tc.includes(gc[i])) { r[i] = 'present'; tc[tc.indexOf(gc[i])] = null; } } return r; }
-    function renderGuess(guess, result) { const row = document.createElement('div'); row.className = 'guess-row'; guess.split('').forEach((char, i) => { const t = document.createElement('div'); t.className = 'tile'; const ti = document.createElement('div'); ti.className = 'tile-inner'; const tf = document.createElement('div'); tf.className = 'tile-face tile-front'; tf.textContent = char; const tb = document.createElement('div'); tb.className = 'tile-face tile-back'; tb.textContent = char; ti.appendChild(tf); ti.appendChild(tb); t.appendChild(ti); setTimeout(() => { t.classList.add('flip'); tb.classList.add(result[i]); }, i * 200); row.appendChild(t); }); historyContainer.appendChild(row); }
-    
-    function winGame() { playVictorySound(); playAgainBtn.classList.remove('hidden'); document.getElementById('finalFreq').textContent = `${targetFrequency} Hz`; document.getElementById('shareResult').textContent = generateShareText(); winModal.classList.add('visible'); triggerConfetti(); }
-    function generateShareText() { const t = `Freque! - Consegui em ${guessHistory.length} tentativas!`; const g = guessHistory.map(r => { return r.map(s => { if (s === 'correct') return '🟩'; if (s === 'present') return '🟨'; return '⬛'; }).join(''); }).join('\n'); const f = `A frequência era ${targetFrequency} Hz\n\nJogue aqui: Gabriel-center.github.io/Freque`; return `${t}\n\n${g}\n\n${f}`; }
+    function updateKeyStates(guess, result) {
+      guess.split('').forEach((key, i) => {
+        const cs = keyStates[key];
+        const ns = result[i];
+        if (ns === 'correct') keyStates[key] = 'correct';
+        else if (ns === 'present' && cs !== 'correct') keyStates[key] = 'present';
+        else if (ns === 'absent' && cs === 'default') keyStates[key] = 'absent';
+      });
+    }
+    function updateKeyboardVisuals() {
+      for (const keyEl of keyboardEl.querySelectorAll('.key')) {
+        const key = keyEl.dataset.key;
+        if ("0123456789".includes(key)) {
+          keyEl.className = 'key';
+          if (keyStates[key] !== 'default') keyEl.classList.add(keyStates[key]);
+        }
+      }
+    }
 
-    // ===== Event Listeners =====
+    // Scoring variants
+    function checkGuessPadrao(guess) {
+      const gc = guess.split(''); const tc = targetFrequencyString.split(''); const r = Array(5).fill('absent');
+      for (let i = 0; i < 5; i++) { if (gc[i] === tc[i]) { r[i] = 'correct'; tc[i] = null; } }
+      for (let i = 0; i < 5; i++) {
+        if (r[i] !== 'correct') {
+          const idx = tc.indexOf(gc[i]);
+          if (idx !== -1) { r[i] = 'present'; tc[idx] = null; }
+        }
+      }
+      return r;
+    }
+    function checkGuessVertical(guess) {
+      const g = guess.split('').map(Number);
+      const t = targetFrequencyString.split('').map(Number);
+      return g.map((d,i)=> d === t[i] ? 'correct' : (d < t[i] ? 'higher' : 'lower'));
+    }
+    function facilShouldUseVerticalForIndex(i){
+      const remaining = correctPositions.filter(v => !v).length;
+      if(remaining === 1 && !correctPositions[i]) return true;
+      const solvedAllUnique = uniqueTargetDigits.size === uniqueDigitsSolved.size;
+      return solvedAllUnique && !correctPositions[i];
+    }
+    function checkGuessFacil(guess){
+      const gc = guess.split(''); const tc = targetFrequencyString.split('');
+      const result = Array(5).fill('absent'); const pool = [...tc];
+      for(let i=0;i<5;i++){ if(gc[i] === tc[i]){ result[i]='correct'; pool[i]=null; } }
+      for(let i=0;i<5;i++){ if(result[i]==='correct'){ correctPositions[i]=true; uniqueDigitsSolved.add(tc[i]); } }
+      for(let i=0;i<5;i++){
+        if(result[i]==='correct') continue;
+        if(facilShouldUseVerticalForIndex(i)){
+          const gi = Number(gc[i]), ti = Number(tc[i]);
+          result[i] = gi === ti ? 'correct' : (gi < ti ? 'higher' : 'lower');
+        } else {
+          const idx = pool.indexOf(gc[i]);
+          result[i] = idx !== -1 ? 'present' : 'absent';
+          if(idx !== -1) pool[idx]=null;
+        }
+      }
+      return result;
+    }
+
+    function renderGuess(guess, result) {
+      const row = document.createElement('div'); row.className = 'guess-row';
+      guess.split('').forEach((char, i) => {
+        const t = document.createElement('div'); t.className = 'tile';
+        const ti = document.createElement('div'); ti.className = 'tile-inner';
+        const tf = document.createElement('div'); tf.className = 'tile-face tile-front'; tf.textContent = char;
+        const tb = document.createElement('div'); tb.className = 'tile-face tile-back'; tb.textContent = char;
+        ti.appendChild(tf); ti.appendChild(tb); t.appendChild(ti);
+        setTimeout(() => { t.classList.add('flip'); tb.classList.add(result[i]); }, i * 200);
+        row.appendChild(t);
+      });
+      historyContainer.appendChild(row);
+    }
+
+    function winGame() {
+      playVictorySound();
+      playAgainBtn.classList.remove('hidden');
+      document.getElementById('finalFreq').textContent = `${targetFrequency} Hz`;
+      document.getElementById('shareResult').textContent = generateShareText();
+      winModal.classList.add('visible');
+      triggerConfetti();
+    }
+    function generateShareText() {
+      const modeLabel = {padrao:'Padrão', facil:'Fácil', unico:'Único', vertical:'Vertical'}[gameMode];
+      const t = `Freque! [${modeLabel}] - Consegui em ${guessHistory.length} tentativa${guessHistory.length===1?'':'s'}!`;
+      const g = guessHistory.map(r => r.map(s => s==='correct'?'🟩':s==='present'?'🟨':s==='higher'?'🔵':s==='lower'?'🔴':'⬛').join('')).join('\n');
+      const f = `A frequência era ${targetFrequency} Hz\n\nJogue aqui: Gabriel-center.github.io/Freque`;
+      return `${t}\n\n${g}\n\n${f}`;
+    }
+
+    // Modals
+    function openModal(el){ el.classList.add('visible'); if(isPlaying) pause(); }
+    function closeAllModals(){ [winModal,helpModal,modeModal,rulesModal].forEach(m=>m.classList.remove('visible')); }
+
+    // Rules content
+    function rulesFor(mode){
+      if(mode==='vertical') return `
+        <ul>
+          <li>Cada slot indica se o dígito correto é <b>maior</b> (🔵 ▲) ou <b>menor</b> (🔴 ▼) que o palpite.</li>
+          <li><span style="color:var(--wordle-green);font-weight:700">Verde</span>: certo.</li>
+        </ul>`;
+      if(mode==='unico') return `
+        <ul>
+          <li>A frequência tem 5 dígitos <b>todos diferentes</b>. Seus palpites também.</li>
+          <li>As cores funcionam como no Padrão.</li>
+        </ul>`;
+      if(mode==='facil') return `
+        <ul>
+          <li>Começa como o <b>Padrão</b>.</li>
+          <li>Quando você acertar pelo menos uma ocorrência de <b>cada dígito</b> presente na frequência, os slots abertos passam a indicar maior (▲) ou menor (▼).</li>
+          <li>Se restar só um slot, ele sempre indica maior/menor.</li>
+        </ul>`;
+      return `<p>Modo padrão.</p>`;
+    }
+
+    // Events
     playAgainBtn.addEventListener('click', newGame);
     submitGuessBtn.addEventListener('click', handleSubmit);
     document.getElementById('playBtn').addEventListener('click', () => { initAudio(); setFrequency(targetFrequency); play(); });
     document.getElementById('pauseBtn').addEventListener('click', pause);
-    
-    // Modal Listeners
-    helpBtn.addEventListener('click', () => { if(isPlaying) pause(); helpModal.classList.add('visible'); });
-    document.querySelectorAll('[data-close-modal]').forEach(el => el.addEventListener('click', () => { winModal.classList.remove('visible'); helpModal.classList.remove('visible'); }));
-    winModal.addEventListener('click', (e) => { if (e.target === winModal) winModal.classList.remove('visible'); });
-    helpModal.addEventListener('click', (e) => { if (e.target === helpModal) helpModal.classList.remove('visible'); });
-    
-    // UPDATED: Robust Clipboard Logic
-    document.getElementById('shareBtn').addEventListener('click', () => {
-        const textToCopy = generateShareText();
-        
-        // Try modern API (https or localhost)
-        if (navigator.clipboard && window.isSecureContext) {
-            navigator.clipboard.writeText(textToCopy).then(() => {
-                alert('Resultado copiado!');
-            }).catch(err => {
-                console.warn('Falha ao copiar com a API moderna, tentando fallback.', err);
-                fallbackCopyTextToClipboard(textToCopy);
-            });
-        } else {
-            // Fallback for insecure contexts (like file://) or old browsers
-            fallbackCopyTextToClipboard(textToCopy);
-        }
+
+    helpBtn.addEventListener('click', () => openModal(helpModal));
+    menuBtn.addEventListener('click', () => openModal(modeModal));
+
+    // Close
+    document.querySelectorAll('[data-close-modal]').forEach(el => el.addEventListener('click', closeAllModals));
+    [winModal,helpModal,modeModal,rulesModal].forEach(m => m.addEventListener('click', e => { if(e.target===m) closeAllModals(); }));
+    window.addEventListener('keydown', e => {
+      if(e.key==='Escape') closeAllModals();
+      if(winModal.classList.contains('visible')||helpModal.classList.contains('visible')||modeModal.classList.contains('visible')||rulesModal.classList.contains('visible')) return;
+      if(e.key==='Enter') handleSubmit();
+      else if(e.key==='Backspace') handleBackspace();
+      else if("0123456789".includes(e.key)) handleKeyPress(e.key);
     });
-    
+
+    // Keyboard clicks
+    keyboardEl.addEventListener('click', (e) => {
+      if(!e.target.matches('[data-key]')) return;
+      const key = e.target.dataset.key;
+      if (key === 'backspace') handleBackspace();
+      else if ("0123456789".includes(key)) handleKeyPress(key);
+    });
+
+    // Mode selection
+    modeModal.addEventListener('click', (e)=>{
+      const card = e.target.closest('.mode-card');
+      if(!card) return;
+      const mode = card.dataset.mode;
+      if(mode==='padrao'){
+        gameMode='padrao'; closeAllModals(); newGame(); return;
+      }
+      pendingMode = mode;
+      rulesBody.innerHTML = rulesFor(mode);
+      closeAllModals();
+      document.getElementById('rulesModal').classList.add('visible');
+    });
+    startModeBtn.addEventListener('click', ()=>{ if(!pendingMode) return; gameMode=pendingMode; pendingMode=null; closeAllModals(); newGame(); });
+
+    // Share
+    document.getElementById('shareBtn').addEventListener('click', () => {
+      const textToCopy = generateShareText();
+      if (navigator.clipboard && window.isSecureContext) {
+        navigator.clipboard.writeText(textToCopy).then(() => alert('Resultado copiado!'))
+        .catch(() => fallbackCopyTextToClipboard(textToCopy));
+      } else {
+        fallbackCopyTextToClipboard(textToCopy);
+      }
+    });
     function fallbackCopyTextToClipboard(text) {
-        const textArea = document.createElement("textarea");
-        textArea.value = text;
-        textArea.style.top = "0";
-        textArea.style.left = "0";
-        textArea.style.position = "fixed";
-        document.body.appendChild(textArea);
-        textArea.focus();
-        textArea.select();
-        try {
-            const successful = document.execCommand('copy');
-            if(successful) alert('Resultado copiado!');
-            else alert('Não foi possível copiar o resultado.');
-        } catch (err) {
-            alert('Não foi possível copiar o resultado.');
-        }
-        document.body.removeChild(textArea);
+      const ta = document.createElement("textarea");
+      ta.value = text; ta.style.top = "0"; ta.style.left = "0"; ta.style.position = "fixed";
+      document.body.appendChild(ta); ta.focus(); ta.select();
+      try { document.execCommand('copy') ? alert('Resultado copiado!') : alert('Não foi possível copiar o resultado.'); }
+      catch { alert('Não foi possível copiar o resultado.'); }
+      document.body.removeChild(ta);
     }
 
-    // Keyboard Listeners
-    keyboardEl.addEventListener('click', (e) => { if(e.target.matches('[data-key]')) { const key = e.target.dataset.key; if (key === 'backspace') handleBackspace(); else if ("0123456789".includes(key)) handleKeyPress(key); } });
-    window.addEventListener('keydown', (e) => { if (e.key === 'Enter') handleSubmit(); else if (e.key === 'Backspace') handleBackspace(); else if ("0123456789".includes(e.key)) handleKeyPress(e.key); });
-
-    // ===== Confetti =====
+    // Confetti
     const canvas = document.getElementById('confetti-canvas'); const ctx = canvas.getContext('2d'); let confettiParticles = [];
     function triggerConfetti() { const pC = 200; const c = ['#6aaa64', '#c9b458', '#d7dadc', '#ffffff']; confettiParticles = []; for (let i = 0; i < pC; i++) { confettiParticles.push({ x: canvas.width / 2, y: canvas.height, vx: (Math.random() - 0.5) * 10, vy: Math.random() * -20 - 15, size: Math.random() * 6 + 2, color: c[Math.floor(Math.random() * c.length)], }); } animateConfetti(); }
-    function animateConfetti() { ctx.clearRect(0, 0, canvas.width, canvas.height); const g = 0.3; confettiParticles.forEach((p, i) => { p.vy += g; p.x += p.vx; p.y += p.vy; ctx.fillStyle = p.color; ctx.fillRect(p.x, p.y, p.size, p.size); if (p.y > canvas.height) { confettiParticles.splice(i, 1); } }); if (confettiParticles.length > 0) { requestAnimationFrame(animateConfetti); } }
+    function animateConfetti() { ctx.clearRect(0, 0, canvas.width, canvas.height); const g = 0.3; confettiParticles = confettiParticles.filter(p => { p.vy += g; p.x += p.vx; p.y += p.vy; ctx.fillStyle = p.color; ctx.fillRect(p.x, p.y, p.size, p.size); return p.y <= canvas.height; }); if (confettiParticles.length > 0) requestAnimationFrame(animateConfetti); }
     window.addEventListener('resize', () => { canvas.width = window.innerWidth; canvas.height = window.innerHeight; });
     canvas.width = window.innerWidth; canvas.height = window.innerHeight;
-    
+
     newGame();
   </script>
 </body>
